@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkquote_rater=self.webpackChunkquote_rater||[]).push([[691],{6738:function(e,t,r){r.r(t);var u=r(7294),n=r(2896),a=r(5804);t.default=function(e){return u.createElement(n.Z,null,u.createElement(a.Z,{heading:"Quote Rater"}))}}}]);
+//# sourceMappingURL=component---src-pages-index-tsx-f58cc7131d21f4b5eb38.js.map

@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkquote_rater=self.webpackChunkquote_rater||[]).push([[218],{9505:function(e,t,u){u.r(t),u.d(t,{default:function(){return r}});var n=u(7294),o=u(2896),r=function(){return n.createElement(o.Z,{heading:"404 Not Found"},n.createElement("div",{className:"utils-module--main_block--S0Wrv"},n.createElement("p",null,"Oopsie Woopsie! Uwu We made a fucky wucky!! A wittle fucko boingo! The code monkeys at our headquarters are working VEWY HAWD to fix this!")))}}}]);
+//# sourceMappingURL=component---src-pages-404-tsx-0e8835b67a0ac2293111.js.map
