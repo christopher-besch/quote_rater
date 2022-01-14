@@ -18,17 +18,18 @@ const Home: React.FC = (props) => {
     let [left_card, set_left_card] = useState("left_card");
     let [right_card, set_right_card] = useState("right_card");
     let [quotes_url, set_quotes_url] = useState("");
+    let [quotes, set_quotes] = useState<Quote[]>([]);
 
     let url_search_params: URLSearchParams;
 
-    let quotes: Quote[];
-    let adj: number[][];
+    let adj: number[][] = [];
 
     useEffect(() => {
         url_search_params = new URLSearchParams(location.search);
         let quotes_url_raw = url_search_params.get("quotes_url");
 
-        set_quotes_url(quotes_url_raw ? quotes_url_raw : "");
+        if (quotes_url == "")
+            set_quotes_url(quotes_url_raw ? quotes_url_raw : "");
     });
 
     function dwn(url: string, callback: { (response: string): void; }): void {
@@ -37,11 +38,11 @@ const Home: React.FC = (props) => {
             if (request.status == 200)
                 callback(request.responseText);
             else {
-                console.error(`Failed to load json '${url}' with status ${request.status}`);
+                console.error(`Failed to load '${url}' with status ${request.status}`);
             }
         };
         request.onerror = () => {
-            console.error(`Failed to load json '${url}'`);
+            console.error(`Failed to load '${url}'`);
         };
         request.open("GET", url, true);
         request.send();
@@ -49,21 +50,23 @@ const Home: React.FC = (props) => {
 
     function load() {
         let quotes_url_input = document.getElementById("quotes_url_input") as HTMLButtonElement;
-        set_quotes_url(quotes_url_input.value);
-        url_search_params.set("quotes_url", quotes_url);
+        let new_quotes_url = quotes_url_input.value;
+        url_search_params.set("quotes_url", new_quotes_url);
         window.history.replaceState({}, "", `${location.pathname}?${url_search_params.toString()}`);
-        console.log(quotes_url_input.value);
-        console.log(quotes_url);
 
-        // dwn(quotes_url, (response) => {
-        //     let match;
-        //     while (match = quote_regex.exec(response)) {
-        //         quotes.push({ origin: match[1], text: match[2], author: match[3], comments: match[4] });
-        //         adj.push([]);
-        //     }
-        //     console.log(quotes);
-        //     console.log(adj);
-        // });
+        dwn(new_quotes_url, (response) => {
+            let match;
+            let new_quotes: Quote[] = [];
+            while (match = quote_regex.exec(response)) {
+                quotes.push({ origin: match[1], text: match[2], author: match[3], comments: match[4] });
+                adj.push([]);
+            }
+            console.log(new_quotes);
+            set_quotes(new_quotes);
+            set_show_cards(true);
+        });
+        // gets applied after this function execution
+        set_quotes_url(new_quotes_url);
     }
 
     function left_better() {
@@ -84,16 +87,19 @@ const Home: React.FC = (props) => {
             <button onClick={load}>Load</button>
 
             {show_cards && (
-                <div className={styles.cards}>
-                    <div className={styles.card}>
-                        <pre><code>
-                            {left_card}
-                        </code></pre>
-                    </div>
-                    <div className={styles.card}>
-                        <pre><code>
-                            {right_card}
-                        </code></pre>
+                <div>
+                    <p>quotes: {quotes.length}</p>
+                    <div className={styles.cards}>
+                        <div className={styles.card}>
+                            <pre><code>
+                                {left_card}
+                            </code></pre>
+                        </div>
+                        <div className={styles.card}>
+                            <pre><code>
+                                {right_card}
+                            </code></pre>
+                        </div>
                     </div>
                     <button onClick={left_better}>Left Better</button>
                     <button onClick={equal}>Roughly Equal</button>
@@ -101,7 +107,6 @@ const Home: React.FC = (props) => {
                 </div>
             )
             }
-            <p>d{quotes_url}</p>
         </Layout >
     );
 };
