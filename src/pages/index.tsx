@@ -83,12 +83,12 @@ const Home: React.FC = (props) => {
                             <div className={styles.cards}>
                                 <div className={styles.card}>
                                     <pre><code>
-                                        {get_left_quote(loaded_quotes, quotes_handler).text}
+                                        {get_left_quote(loaded_quotes, quotes_handler)?.text}
                                     </code></pre>
                                 </div>
                                 <div className={styles.card}>
                                     <pre><code>
-                                        {get_right_quote(loaded_quotes, quotes_handler).text}
+                                        {get_right_quote(loaded_quotes, quotes_handler)?.text}
                                     </code></pre>
                                 </div>
                             </div>

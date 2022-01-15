@@ -88,7 +88,7 @@ export function setup_quotes_handler(loaded_quotes: LoadedQuotes): QuotesHandler
     }
     quotes_handler.components_amount = quotes_handler.quotes_amount;
     calc_order(quotes_handler);
-    update_question(quotes_handler);
+    next_question(quotes_handler);
     return quotes_handler;
 }
 
@@ -112,6 +112,7 @@ export function set_right_better(quotes_handler: QuotesHandler): QuotesHandler {
 }
 
 export function get_quotes_string(loaded_quotes: LoadedQuotes, quotes_handler: QuotesHandler): string {
+    console.log(quotes_handler.quotes_order);
     let out: string = "";
     for (let idx of quotes_handler.quotes_order) {
         let quote = loaded_quotes.quotes[idx];
@@ -120,10 +121,15 @@ export function get_quotes_string(loaded_quotes: LoadedQuotes, quotes_handler: Q
     return out;
 }
 
-export function get_left_quote(loaded_quotes: LoadedQuotes, quotes_handler: QuotesHandler): Quote {
+// bounds checking required because of React fuckery
+export function get_left_quote(loaded_quotes: LoadedQuotes, quotes_handler: QuotesHandler): Quote | undefined {
+    if (quotes_handler.left_idx >= loaded_quotes.quotes.length)
+        return undefined;
     return loaded_quotes.quotes[quotes_handler.left_idx];
 }
-export function get_right_quote(loaded_quotes: LoadedQuotes, quotes_handler: QuotesHandler): Quote {
+export function get_right_quote(loaded_quotes: LoadedQuotes, quotes_handler: QuotesHandler): Quote | undefined {
+    if (quotes_handler.right_idx >= loaded_quotes.quotes.length)
+        return undefined;
     return loaded_quotes.quotes[quotes_handler.right_idx];
 }
 
@@ -167,7 +173,8 @@ function calc_order(quotes_handler: QuotesHandler,): void {
     let status: number[] = [];
     for (let i = 0; i < quotes_handler.quotes_amount; ++i)
         status.push(0);
-    for (let i = 0; i < quotes_handler.quotes_amount; ++i)
+    // reverse <- more convenient
+    for (let i = quotes_handler.quotes_amount - 1; i >= 0; --i)
         top_sort(quotes_handler, i, status);
     quotes_handler.quotes_order.reverse();
     console.log(quotes_handler.quotes_order);
@@ -189,8 +196,8 @@ function next_question(quotes_handler: QuotesHandler): void {
         return;
     // terribly inefficient, too bad
     do {
-        quotes_handler.left_idx = Math.floor(Math.random() * quotes_handler.quotes_amount);
-        quotes_handler.right_idx = Math.floor(Math.random() * quotes_handler.quotes_amount);
-    } while (same(quotes_handler, quotes_handler.left_idx, quotes_handler.right_idx))
+        quotes_handler.left_idx = find(quotes_handler, Math.floor(Math.random() * quotes_handler.quotes_amount));
+        quotes_handler.right_idx = find(quotes_handler, Math.floor(Math.random() * quotes_handler.quotes_amount));
+    } while (quotes_handler.left_idx == quotes_handler.right_idx)
     console.log(`using quotes ${quotes_handler.left_idx} and ${quotes_handler.right_idx}`);
 }
