@@ -1,3 +1,5 @@
+import { join } from "path/posix";
+
 const quote_regex = /### +(.*)\n```\n((?:.|\n)*?)\n—(.*)\n```\n((?:- +.+\n)*)/gm;
 
 export type Quote = {
@@ -63,18 +65,20 @@ function copy_quotes_handler(quotes_handler: QuotesHandler): QuotesHandler {
     };
 }
 
-export function setup_loaded_quotes(loaded_quotes: LoadedQuotes, url: string = "", callback: { (loaded_quotes: LoadedQuotes): void } = () => { }): void {
+export function setup_loaded_quotes(url: string = "", callback: { (loaded_quotes: LoadedQuotes): void } = () => { }): void {
+    let loaded_quotes = get_loaded_quotes();
     loaded_quotes.url = url;
     dwn(url, (response) => {
         let match;
         while (match = quote_regex.exec(response)) {
             loaded_quotes.quotes.push({ origin: match[1], text: match[2], author: match[3], comments: match[4] });
         }
-        callback(copy_loaded_quotes(loaded_quotes));
+        callback(loaded_quotes);
     });
 }
 
-export function setup_quotes_handler(quotes_handler: QuotesHandler, loaded_quotes: LoadedQuotes): QuotesHandler {
+export function setup_quotes_handler(loaded_quotes: LoadedQuotes): QuotesHandler {
+    let quotes_handler = get_quotes_handler();
     quotes_handler.quotes_amount = loaded_quotes.quotes.length;
     quotes_handler.should_render = true;
     for (let i = 0; i < quotes_handler.quotes_amount; ++i) {
@@ -83,17 +87,27 @@ export function setup_quotes_handler(quotes_handler: QuotesHandler, loaded_quote
         quotes_handler.size[i] = 1;
     }
     quotes_handler.components_amount = quotes_handler.quotes_amount;
-    top_sort(quotes_handler);
-    return copy_quotes_handler(quotes_handler);
+    calc_order(quotes_handler);
+    update_question(quotes_handler);
+    return quotes_handler;
 }
 
-export function next_question(quotes_handler: QuotesHandler): QuotesHandler {
-    // terribly inefficient, too bad
-    do {
-        quotes_handler.left_idx = Math.floor(Math.random() * quotes_handler.quotes_amount);
-        quotes_handler.right_idx = Math.floor(Math.random() * quotes_handler.quotes_amount);
-    } while (same(quotes_handler, quotes_handler.left_idx, quotes_handler.right_idx))
-    console.log(`using quotes ${quotes_handler.left_idx} and ${quotes_handler.right_idx}`);
+export function update_question(quotes_handler: QuotesHandler): QuotesHandler {
+    next_question(quotes_handler);
+    return copy_quotes_handler(quotes_handler);
+}
+export function set_left_better(quotes_handler: QuotesHandler): QuotesHandler {
+    quotes_handler.adj[quotes_handler.left_idx].push(quotes_handler.right_idx);
+    unite(quotes_handler, quotes_handler.left_idx, quotes_handler.right_idx);
+    calc_order(quotes_handler);
+    next_question(quotes_handler);
+    return copy_quotes_handler(quotes_handler);
+}
+export function set_right_better(quotes_handler: QuotesHandler): QuotesHandler {
+    quotes_handler.adj[quotes_handler.right_idx].push(quotes_handler.left_idx);
+    unite(quotes_handler, quotes_handler.left_idx, quotes_handler.right_idx);
+    calc_order(quotes_handler);
+    next_question(quotes_handler);
     return copy_quotes_handler(quotes_handler);
 }
 
@@ -148,23 +162,35 @@ function unite(quotes_handler: QuotesHandler, a: number, b: number): void {
     --quotes_handler.components_amount;
 }
 
-function top_sort(quotes_handler: QuotesHandler,): void {
+function calc_order(quotes_handler: QuotesHandler,): void {
     quotes_handler.quotes_order = [];
     let status: number[] = [];
     for (let i = 0; i < quotes_handler.quotes_amount; ++i)
         status.push(0);
     for (let i = 0; i < quotes_handler.quotes_amount; ++i)
-        top(quotes_handler, i, status);
+        top_sort(quotes_handler, i, status);
+    quotes_handler.quotes_order.reverse();
+    console.log(quotes_handler.quotes_order);
 }
-function top(quotes_handler: QuotesHandler, cur: number, status: number[]) {
+function top_sort(quotes_handler: QuotesHandler, cur: number, status: number[]) {
     if (status[cur] == 2)
         return;
     status[cur] = 1;
 
     for (let next of quotes_handler.adj[cur])
-        top(quotes_handler, next, status);
+        top_sort(quotes_handler, next, status);
 
     quotes_handler.quotes_order.push(cur);
     status[cur] = 2;
 }
 
+function next_question(quotes_handler: QuotesHandler): void {
+    if (quotes_handler.components_amount < 2)
+        return;
+    // terribly inefficient, too bad
+    do {
+        quotes_handler.left_idx = Math.floor(Math.random() * quotes_handler.quotes_amount);
+        quotes_handler.right_idx = Math.floor(Math.random() * quotes_handler.quotes_amount);
+    } while (same(quotes_handler, quotes_handler.left_idx, quotes_handler.right_idx))
+    console.log(`using quotes ${quotes_handler.left_idx} and ${quotes_handler.right_idx}`);
+}

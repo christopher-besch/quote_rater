@@ -1,21 +1,11 @@
 @import "consts.scss";
 
 .card {
-    margin: 8px;
-    padding: 0px 8px;
+    margin: 8px 0px;
+    padding: 8px;
     align-items: center;
+    width: 100%;
 
     background: $back_sec;
     border-radius: $border-radius;
-}
-.cards::after {
-    content: "";
-    display: table;
-    clear: both;
-}
-
-.card {
-    padding: 8px;
-    float: left;
-    width: calc(50% - 16px);
 }

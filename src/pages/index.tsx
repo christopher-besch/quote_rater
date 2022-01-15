@@ -10,10 +10,12 @@ import {
     get_quotes_handler,
     setup_loaded_quotes,
     setup_quotes_handler,
-    next_question,
     get_left_quote,
     get_right_quote,
-    get_quotes_string
+    get_quotes_string,
+    update_question,
+    set_left_better,
+    set_right_better,
 } from "src/utils/quotes";
 
 const Home: React.FC = (props) => {
@@ -36,28 +38,29 @@ const Home: React.FC = (props) => {
         url_search_params.set("quotes_url", quotes_url);
         window.history.replaceState({}, "", `${location.pathname}?${url_search_params.toString()}`);
 
-        setup_loaded_quotes(loaded_quotes, quotes_url, (new_loaded_quotes) => {
+        console.log("loading quotes: ...");
+        setup_loaded_quotes(quotes_url, (new_loaded_quotes) => {
             set_loaded_quotes(new_loaded_quotes);
-            setup_quotes_handler(quotes_handler, new_loaded_quotes);
             set_quotes_handler((quotes_handler) => {
-                return next_question(quotes_handler);
+                return setup_quotes_handler(new_loaded_quotes);
             });
+            console.log("loading quotes: ok")
         });
     }
 
-    function left_better() {
+    function left_button_callback() {
         set_quotes_handler((quotes_handler) => {
-            return next_question(quotes_handler);
+            return set_left_better(quotes_handler);
         });
     }
-    function equal() {
+    function equal_button_callback() {
         set_quotes_handler((quotes_handler) => {
-            return next_question(quotes_handler);
+            return update_question(quotes_handler);
         });
     }
-    function right_better() {
+    function right_button_callback() {
         set_quotes_handler((quotes_handler) => {
-            return next_question(quotes_handler);
+            return set_right_better(quotes_handler);
         });
     }
 
@@ -72,21 +75,25 @@ const Home: React.FC = (props) => {
                 <div>
                     <p>quotes: {quotes_handler.quotes_amount}</p>
                     <p>components: {quotes_handler.components_amount}</p>
-                    <div className={styles.cards}>
-                        <div className={styles.card}>
-                            <pre><code>
-                                {get_left_quote(loaded_quotes, quotes_handler).text}
-                            </code></pre>
+                    {quotes_handler.components_amount > 1 &&
+                        <div>
+                            <button onClick={left_button_callback}>First Better</button>
+                            <button onClick={equal_button_callback}>Roughly Equal</button>
+                            <button onClick={right_button_callback}>Second Better</button>
+                            <div className={styles.cards}>
+                                <div className={styles.card}>
+                                    <pre><code>
+                                        {get_left_quote(loaded_quotes, quotes_handler).text}
+                                    </code></pre>
+                                </div>
+                                <div className={styles.card}>
+                                    <pre><code>
+                                        {get_right_quote(loaded_quotes, quotes_handler).text}
+                                    </code></pre>
+                                </div>
+                            </div>
                         </div>
-                        <div className={styles.card}>
-                            <pre><code>
-                                {get_right_quote(loaded_quotes, quotes_handler).text}
-                            </code></pre>
-                        </div>
-                    </div>
-                    <button onClick={left_better}>Left Better</button>
-                    <button onClick={equal}>Roughly Equal</button>
-                    <button onClick={right_better}>Right Better</button>
+                    }
                     <h1>Ordered Quotes:</h1>
                     <pre><code>
                         {get_quotes_string(loaded_quotes, quotes_handler)}
