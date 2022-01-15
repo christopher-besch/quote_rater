@@ -37,6 +37,8 @@ export type QuotesHandler = {
     right_idx: number;
     quotes_amount: number,
     components_amount: number;
+    questions_amount: number;
+    done: boolean;
 };
 export function get_quotes_handler(): QuotesHandler {
     return {
@@ -49,6 +51,8 @@ export function get_quotes_handler(): QuotesHandler {
         right_idx: -1,
         quotes_amount: 0,
         components_amount: 0,
+        questions_amount: 0,
+        done: false,
     };
 }
 function copy_quotes_handler(quotes_handler: QuotesHandler): QuotesHandler {
@@ -62,6 +66,8 @@ function copy_quotes_handler(quotes_handler: QuotesHandler): QuotesHandler {
         right_idx: quotes_handler.right_idx,
         quotes_amount: quotes_handler.quotes_amount,
         components_amount: quotes_handler.components_amount,
+        questions_amount: quotes_handler.questions_amount,
+        done: quotes_handler.done,
     };
 }
 
@@ -97,22 +103,25 @@ export function update_question(quotes_handler: QuotesHandler): QuotesHandler {
     return copy_quotes_handler(quotes_handler);
 }
 export function set_left_better(quotes_handler: QuotesHandler): QuotesHandler {
+    console.log(`${quotes_handler.left_idx} better than ${quotes_handler.right_idx}`);
     quotes_handler.adj[quotes_handler.left_idx].push(quotes_handler.right_idx);
     unite(quotes_handler, quotes_handler.left_idx, quotes_handler.right_idx);
     calc_order(quotes_handler);
     next_question(quotes_handler);
+    ++quotes_handler.questions_amount;
     return copy_quotes_handler(quotes_handler);
 }
 export function set_right_better(quotes_handler: QuotesHandler): QuotesHandler {
+    console.log(`${quotes_handler.right_idx} better than ${quotes_handler.left_idx}`);
     quotes_handler.adj[quotes_handler.right_idx].push(quotes_handler.left_idx);
     unite(quotes_handler, quotes_handler.left_idx, quotes_handler.right_idx);
     calc_order(quotes_handler);
     next_question(quotes_handler);
+    ++quotes_handler.questions_amount;
     return copy_quotes_handler(quotes_handler);
 }
 
 export function get_quotes_string(loaded_quotes: LoadedQuotes, quotes_handler: QuotesHandler): string {
-    console.log(quotes_handler.quotes_order);
     let out: string = "";
     for (let idx of quotes_handler.quotes_order) {
         let quote = loaded_quotes.quotes[idx];
@@ -157,10 +166,12 @@ function find(quotes_handler: QuotesHandler, x: number): number {
 function same(quotes_handler: QuotesHandler, a: number, b: number): boolean {
     return find(quotes_handler, a) == find(quotes_handler, b);
 }
-// don't use with nodes from same component
 function unite(quotes_handler: QuotesHandler, a: number, b: number): void {
     a = find(quotes_handler, a);
     b = find(quotes_handler, b);
+    // in same component
+    if (a == b)
+        return;
     if (quotes_handler.size[a] < quotes_handler.size[b])
         [a, b] = [b, a];
     quotes_handler.size[a] += quotes_handler.size[b];
@@ -168,7 +179,7 @@ function unite(quotes_handler: QuotesHandler, a: number, b: number): void {
     --quotes_handler.components_amount;
 }
 
-function calc_order(quotes_handler: QuotesHandler,): void {
+function calc_order(quotes_handler: QuotesHandler): void {
     quotes_handler.quotes_order = [];
     let status: number[] = [];
     for (let i = 0; i < quotes_handler.quotes_amount; ++i)
@@ -177,11 +188,15 @@ function calc_order(quotes_handler: QuotesHandler,): void {
     for (let i = quotes_handler.quotes_amount - 1; i >= 0; --i)
         top_sort(quotes_handler, i, status);
     quotes_handler.quotes_order.reverse();
-    console.log(quotes_handler.quotes_order);
 }
-function top_sort(quotes_handler: QuotesHandler, cur: number, status: number[]) {
+function top_sort(quotes_handler: QuotesHandler, cur: number, status: number[]): void {
     if (status[cur] == 2)
         return;
+    // ignore cycles
+    if (status[cur] == 1) {
+        console.log("cycle detected");
+        return;
+    }
     status[cur] = 1;
 
     for (let next of quotes_handler.adj[cur])
@@ -191,13 +206,73 @@ function top_sort(quotes_handler: QuotesHandler, cur: number, status: number[]) 
     status[cur] = 2;
 }
 
+function get_unconnected(quotes_handler: QuotesHandler, start: number): number {
+    // get all from start reachable nodes
+    let visited: boolean[] = [];
+    for (let i = 0; i < quotes_handler.quotes_amount; ++i)
+        visited.push(false);
+    top_search(quotes_handler, start, visited, -1);
+    // get all unreachables and randomize
+    let unreachables: number[] = [];
+    for (let i = 0; i < visited.length; ++i)
+        if (!visited[i])
+            unreachables.push(i);
+    unreachables.sort(() => Math.random() - 0.5);
+    // return nodes from which start can't be reached
+    for (let unreachable of unreachables)
+        if (!is_connected(quotes_handler, unreachable, start))
+            return unreachable;
+    return -1;
+}
+function is_connected(quotes_handler: QuotesHandler, start: number, target: number): boolean {
+    let visited: boolean[] = [];
+    for (let i = 0; i < quotes_handler.quotes_amount; ++i)
+        visited.push(false);
+    return top_search(quotes_handler, start, visited, target);
+}
+function top_search(quotes_handler: QuotesHandler, cur: number, visited: boolean[], target: number): boolean {
+    if (cur == target)
+        return true;
+    if (visited[cur])
+        return false;
+    visited[cur] = true;
+
+    for (let next of quotes_handler.adj[cur])
+        if (top_search(quotes_handler, next, visited, target))
+            return true;
+    return false;
+}
+
 function next_question(quotes_handler: QuotesHandler): void {
-    if (quotes_handler.components_amount < 2)
-        return;
-    // terribly inefficient, too bad
-    do {
-        quotes_handler.left_idx = find(quotes_handler, Math.floor(Math.random() * quotes_handler.quotes_amount));
-        quotes_handler.right_idx = find(quotes_handler, Math.floor(Math.random() * quotes_handler.quotes_amount));
-    } while (quotes_handler.left_idx == quotes_handler.right_idx)
-    console.log(`using quotes ${quotes_handler.left_idx} and ${quotes_handler.right_idx}`);
+    // get random ordering
+    let quotes_idxs: number[] = [];
+    for (let i = 0; i < quotes_handler.quotes_amount; ++i)
+        quotes_idxs.push(i);
+    quotes_idxs.sort(() => Math.random() - 0.5);
+
+    // in beginning, when multiple components exist, only connect components
+    if (quotes_handler.components_amount > 1) {
+        for (let left_idx of quotes_idxs) {
+            for (let right_idx of quotes_idxs) {
+                if (!same(quotes_handler, left_idx, right_idx)) {
+                    quotes_handler.left_idx = left_idx;
+                    quotes_handler.right_idx = right_idx;
+                    return;
+                }
+            }
+        }
+    }
+    // else get unconnected quotes, the system can't tell which one's better
+    else {
+        for (let left_idx of quotes_idxs) {
+            let right_idx = get_unconnected(quotes_handler, left_idx);
+            if (right_idx != -1) {
+                quotes_handler.left_idx = left_idx;
+                quotes_handler.right_idx = right_idx;
+                return;
+            }
+        }
+    }
+    console.log("no more info required");
+    quotes_handler.done = true;
 }

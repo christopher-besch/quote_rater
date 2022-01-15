@@ -75,7 +75,8 @@ const Home: React.FC = (props) => {
                 <div>
                     <p>quotes: {quotes_handler.quotes_amount}</p>
                     <p>components: {quotes_handler.components_amount}</p>
-                    {quotes_handler.components_amount > 1 &&
+                    <p>answered questions: {quotes_handler.questions_amount}</p>
+                    {!quotes_handler.done &&
                         <div>
                             <button onClick={left_button_callback}>First Better</button>
                             <button onClick={equal_button_callback}>Roughly Equal</button>
