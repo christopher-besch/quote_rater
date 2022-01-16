@@ -10,6 +10,7 @@ import {
     get_quotes_handler,
     setup_loaded_quotes,
     setup_quotes_handler,
+    update_loaded_quotes,
     get_left_quote,
     get_right_quote,
     get_quotes_string,
@@ -24,43 +25,57 @@ const Home: React.FC = (props) => {
 
     // run for each refresh
     useEffect(() => {
+        // update input values
         let url_search_params = new URLSearchParams(location.search);
+
         let quotes_url_raw = url_search_params.get("quotes_url");
-        let quotes_url_input = document.getElementById("quotes_url_input") as HTMLButtonElement;
+        let quotes_url_input = document.getElementById("quotes_url_input") as HTMLInputElement;
         if (quotes_url_input.value == "")
             quotes_url_input.value = quotes_url_raw ? quotes_url_raw : "";
+
+        let answers_json_raw = url_search_params.get("answers_json");
+        let answers_json_input = document.getElementById("answers_json_input") as HTMLInputElement;
+        if (answers_json_input.value == "")
+            answers_json_input.value = answers_json_raw ? answers_json_raw : "";
     });
 
     function load() {
-        let url_search_params = new URLSearchParams(location.search);
-        let quotes_url_input = document.getElementById("quotes_url_input") as HTMLButtonElement;
-        let quotes_url = quotes_url_input.value;
-        url_search_params.set("quotes_url", quotes_url);
-        window.history.replaceState({}, "", `${location.pathname}?${url_search_params.toString()}`);
-
         console.log("loading quotes: ...");
-        setup_loaded_quotes(quotes_url, (new_loaded_quotes) => {
+        let quotes_url_input = document.getElementById("quotes_url_input") as HTMLInputElement;
+        let answers_json_input = document.getElementById("answers_json_input") as HTMLInputElement;
+
+        setup_loaded_quotes(quotes_url_input, answers_json_input, (new_loaded_quotes) => {
             set_loaded_quotes(new_loaded_quotes);
-            set_quotes_handler((quotes_handler) => {
-                return setup_quotes_handler(new_loaded_quotes);
-            });
+            set_quotes_handler(setup_quotes_handler(new_loaded_quotes));
             console.log("loading quotes: ok")
         });
     }
 
     function left_button_callback() {
         set_quotes_handler((quotes_handler) => {
-            return set_left_better(quotes_handler);
+            let new_quotes_handler = set_left_better(quotes_handler);
+            set_loaded_quotes((loaded_quotes) => {
+                return update_loaded_quotes(loaded_quotes, new_quotes_handler);
+            });
+            return new_quotes_handler
         });
     }
     function equal_button_callback() {
         set_quotes_handler((quotes_handler) => {
-            return update_question(quotes_handler);
+            let new_quotes_handler = update_question(quotes_handler);
+            set_loaded_quotes((loaded_quotes) => {
+                return update_loaded_quotes(loaded_quotes, new_quotes_handler);
+            });
+            return new_quotes_handler
         });
     }
     function right_button_callback() {
         set_quotes_handler((quotes_handler) => {
-            return set_right_better(quotes_handler);
+            let new_quotes_handler = set_right_better(quotes_handler);
+            set_loaded_quotes((loaded_quotes) => {
+                return update_loaded_quotes(loaded_quotes, new_quotes_handler);
+            });
+            return new_quotes_handler
         });
     }
 
@@ -69,13 +84,15 @@ const Home: React.FC = (props) => {
             <Heading heading="Quote Rater" />
             <label htmlFor="quotes_url_input">Input Quotes URL: </label>
             <input id="quotes_url_input" type="text"></input><br />
+            <label htmlFor="answers_json_input">Input Answered JSON: </label>
+            <input id="answers_json_input" type="text"></input><br />
             <button onClick={load}>Load</button>
 
             {quotes_handler.should_render && (
                 <div>
                     <p>quotes: {quotes_handler.quotes_amount}</p>
                     <p>components: {quotes_handler.components_amount}</p>
-                    <p>answered questions: {quotes_handler.questions_amount}</p>
+                    <p>answered questions: {quotes_handler.answers.length}</p>
                     {!quotes_handler.done &&
                         <div>
                             <button onClick={left_button_callback}>First Better</button>

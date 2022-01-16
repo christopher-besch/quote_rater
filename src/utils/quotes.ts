@@ -1,5 +1,3 @@
-import { join } from "path/posix";
-
 const quote_regex = /### +(.*)\n```\n((?:.|\n)*?)\n—(.*)\n```\n((?:- +.+\n)*)/gm;
 
 export type Quote = {
@@ -9,21 +7,35 @@ export type Quote = {
     comments: string;
 };
 
+export type Answer = {
+    better: number;
+    worse: number;
+};
+
 // React doesn't support mutable objects...JavaScript doesn't allow constructor overloading...RAAI through the drain...this hurts
 export type LoadedQuotes = {
     quotes: Quote[];
     url: string;
+    answers_json: string;
+    quotes_url_input: HTMLInputElement | null;
+    answers_json_input: HTMLInputElement | null;
 };
 export function get_loaded_quotes(): LoadedQuotes {
     return {
         quotes: [],
         url: "",
+        answers_json: "",
+        quotes_url_input: null,
+        answers_json_input: null,
     };
 }
 function copy_loaded_quotes(loaded_quotes: LoadedQuotes): LoadedQuotes {
     return {
         quotes: loaded_quotes.quotes,
         url: loaded_quotes.url,
+        answers_json: loaded_quotes.answers_json,
+        quotes_url_input: loaded_quotes.quotes_url_input,
+        answers_json_input: loaded_quotes.answers_json_input,
     }
 }
 
@@ -37,8 +49,8 @@ export type QuotesHandler = {
     right_idx: number;
     quotes_amount: number,
     components_amount: number;
-    questions_amount: number;
     done: boolean;
+    answers: Answer[];
 };
 export function get_quotes_handler(): QuotesHandler {
     return {
@@ -51,8 +63,8 @@ export function get_quotes_handler(): QuotesHandler {
         right_idx: -1,
         quotes_amount: 0,
         components_amount: 0,
-        questions_amount: 0,
         done: false,
+        answers: [],
     };
 }
 function copy_quotes_handler(quotes_handler: QuotesHandler): QuotesHandler {
@@ -66,15 +78,20 @@ function copy_quotes_handler(quotes_handler: QuotesHandler): QuotesHandler {
         right_idx: quotes_handler.right_idx,
         quotes_amount: quotes_handler.quotes_amount,
         components_amount: quotes_handler.components_amount,
-        questions_amount: quotes_handler.questions_amount,
         done: quotes_handler.done,
+        answers: quotes_handler.answers,
     };
 }
 
-export function setup_loaded_quotes(url: string = "", callback: { (loaded_quotes: LoadedQuotes): void } = () => { }): void {
+export function setup_loaded_quotes(quotes_url_input: HTMLInputElement, answers_json_input: HTMLInputElement, callback: { (loaded_quotes: LoadedQuotes): void } = () => { }): void {
     let loaded_quotes = get_loaded_quotes();
-    loaded_quotes.url = url;
-    dwn(url, (response) => {
+    loaded_quotes.quotes_url_input = quotes_url_input;
+    loaded_quotes.answers_json_input = answers_json_input;
+    loaded_quotes.url = quotes_url_input.value;
+    loaded_quotes.answers_json = answers_json_input.value;
+    update_url_search_params(loaded_quotes);
+
+    dwn(loaded_quotes.url, (response) => {
         let match;
         while (match = quote_regex.exec(response)) {
             loaded_quotes.quotes.push({ origin: match[1], text: match[2], author: match[3], comments: match[4] });
@@ -93,9 +110,33 @@ export function setup_quotes_handler(loaded_quotes: LoadedQuotes): QuotesHandler
         quotes_handler.size[i] = 1;
     }
     quotes_handler.components_amount = quotes_handler.quotes_amount;
+    if (loaded_quotes.answers_json != "")
+        quotes_handler.answers = JSON.parse(loaded_quotes.answers_json);
+    for (let answer of quotes_handler.answers)
+        set_answer_headless(quotes_handler, answer.better, answer.worse);
     calc_order(quotes_handler);
     next_question(quotes_handler);
     return quotes_handler;
+}
+
+export function update_loaded_quotes(loaded_quotes: LoadedQuotes, quotes_handler: QuotesHandler): LoadedQuotes {
+    loaded_quotes.answers_json = JSON.stringify(quotes_handler.answers);
+    update_url_search_params(loaded_quotes);
+    return copy_loaded_quotes(loaded_quotes);
+}
+
+function update_url_search_params(loaded_quotes: LoadedQuotes): void {
+    let url_search_params = new URLSearchParams(location.search);
+
+    url_search_params.set("quotes_url", loaded_quotes.url);
+    url_search_params.set("answers_json", loaded_quotes.answers_json);
+
+    window.history.replaceState({}, "", `${location.pathname}?${url_search_params.toString()}`);
+
+    if (loaded_quotes.answers_json_input != null)
+        loaded_quotes.answers_json_input.value = loaded_quotes.answers_json;
+    if (loaded_quotes.quotes_url_input != null)
+        loaded_quotes.quotes_url_input.value = loaded_quotes.url;
 }
 
 export function update_question(quotes_handler: QuotesHandler): QuotesHandler {
@@ -103,21 +144,11 @@ export function update_question(quotes_handler: QuotesHandler): QuotesHandler {
     return copy_quotes_handler(quotes_handler);
 }
 export function set_left_better(quotes_handler: QuotesHandler): QuotesHandler {
-    console.log(`${quotes_handler.left_idx} better than ${quotes_handler.right_idx}`);
-    quotes_handler.adj[quotes_handler.left_idx].push(quotes_handler.right_idx);
-    unite(quotes_handler, quotes_handler.left_idx, quotes_handler.right_idx);
-    calc_order(quotes_handler);
-    next_question(quotes_handler);
-    ++quotes_handler.questions_amount;
+    set_answer(quotes_handler, quotes_handler.left_idx, quotes_handler.right_idx);
     return copy_quotes_handler(quotes_handler);
 }
 export function set_right_better(quotes_handler: QuotesHandler): QuotesHandler {
-    console.log(`${quotes_handler.right_idx} better than ${quotes_handler.left_idx}`);
-    quotes_handler.adj[quotes_handler.right_idx].push(quotes_handler.left_idx);
-    unite(quotes_handler, quotes_handler.left_idx, quotes_handler.right_idx);
-    calc_order(quotes_handler);
-    next_question(quotes_handler);
-    ++quotes_handler.questions_amount;
+    set_answer(quotes_handler, quotes_handler.right_idx, quotes_handler.left_idx);
     return copy_quotes_handler(quotes_handler);
 }
 
@@ -241,6 +272,18 @@ function top_search(quotes_handler: QuotesHandler, cur: number, visited: boolean
         if (top_search(quotes_handler, next, visited, target))
             return true;
     return false;
+}
+
+function set_answer(quotes_handler: QuotesHandler, better: number, worse: number): void {
+    set_answer_headless(quotes_handler, better, worse);
+    calc_order(quotes_handler);
+    next_question(quotes_handler);
+    quotes_handler.answers.push({ better, worse });
+}
+function set_answer_headless(quotes_handler: QuotesHandler, better: number, worse: number): void {
+    console.log(`${better} better than ${worse}`);
+    quotes_handler.adj[better].push(worse);
+    unite(quotes_handler, better, worse);
 }
 
 function next_question(quotes_handler: QuotesHandler): void {
