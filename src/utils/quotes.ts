@@ -7,10 +7,8 @@ export type Quote = {
     comments: string;
 };
 
-export type Answer = {
-    better: number;
-    worse: number;
-};
+// better index, worse index
+export type Answer = number[];
 
 // React doesn't support mutable objects...JavaScript doesn't allow constructor overloading...RAAI through the drain...this hurts
 export type LoadedQuotes = {
@@ -83,6 +81,7 @@ function copy_quotes_handler(quotes_handler: QuotesHandler): QuotesHandler {
     };
 }
 
+// download quotes
 export function setup_loaded_quotes(quotes_url_input: HTMLInputElement, answers_json_input: HTMLInputElement, callback: { (loaded_quotes: LoadedQuotes): void } = () => { }): void {
     let loaded_quotes = get_loaded_quotes();
     loaded_quotes.quotes_url_input = quotes_url_input;
@@ -91,7 +90,7 @@ export function setup_loaded_quotes(quotes_url_input: HTMLInputElement, answers_
     loaded_quotes.answers_json = answers_json_input.value;
     update_url_search_params(loaded_quotes);
 
-    dwn(loaded_quotes.url, (response) => {
+    download_file(loaded_quotes.url, (response) => {
         let match;
         while (match = quote_regex.exec(response)) {
             loaded_quotes.quotes.push({ origin: match[1], text: match[2], author: match[3], comments: match[4] });
@@ -100,28 +99,10 @@ export function setup_loaded_quotes(quotes_url_input: HTMLInputElement, answers_
     });
 }
 
-export function setup_quotes_handler(loaded_quotes: LoadedQuotes): QuotesHandler {
-    let quotes_handler = get_quotes_handler();
-    quotes_handler.quotes_amount = loaded_quotes.quotes.length;
-    quotes_handler.should_render = true;
-    for (let i = 0; i < quotes_handler.quotes_amount; ++i) {
-        quotes_handler.adj.push([]);
-        quotes_handler.link[i] = i;
-        quotes_handler.size[i] = 1;
-    }
-    quotes_handler.components_amount = quotes_handler.quotes_amount;
-    if (loaded_quotes.answers_json != "")
-        quotes_handler.answers = JSON.parse(loaded_quotes.answers_json);
-    for (let answer of quotes_handler.answers)
-        set_answer_headless(quotes_handler, answer.better, answer.worse);
-    calc_order(quotes_handler);
-    next_question(quotes_handler);
-    return quotes_handler;
-}
-
 export function update_loaded_quotes(loaded_quotes: LoadedQuotes, quotes_handler: QuotesHandler): LoadedQuotes {
     loaded_quotes.answers_json = JSON.stringify(quotes_handler.answers);
     update_url_search_params(loaded_quotes);
+    update_input_values(loaded_quotes);
     return copy_loaded_quotes(loaded_quotes);
 }
 
@@ -132,11 +113,34 @@ function update_url_search_params(loaded_quotes: LoadedQuotes): void {
     url_search_params.set("answers_json", loaded_quotes.answers_json);
 
     window.history.replaceState({}, "", `${location.pathname}?${url_search_params.toString()}`);
+}
 
+function update_input_values(loaded_quotes: LoadedQuotes): void {
     if (loaded_quotes.answers_json_input != null)
         loaded_quotes.answers_json_input.value = loaded_quotes.answers_json;
     if (loaded_quotes.quotes_url_input != null)
         loaded_quotes.quotes_url_input.value = loaded_quotes.url;
+}
+
+// initiate graph algorithms
+export function setup_quotes_handler(loaded_quotes: LoadedQuotes): QuotesHandler {
+    let quotes_handler = get_quotes_handler();
+    quotes_handler.quotes_amount = loaded_quotes.quotes.length;
+    quotes_handler.components_amount = quotes_handler.quotes_amount;
+    quotes_handler.should_render = true;
+    for (let i = 0; i < quotes_handler.quotes_amount; ++i) {
+        quotes_handler.adj.push([]);
+        quotes_handler.link[i] = i;
+        quotes_handler.size[i] = 1;
+    }
+    // apply pre-programmed answers
+    if (loaded_quotes.answers_json != "")
+        quotes_handler.answers = JSON.parse(loaded_quotes.answers_json);
+    for (let answer of quotes_handler.answers)
+        set_answer_headless(quotes_handler, answer[0], answer[1]);
+    calc_order(quotes_handler);
+    next_question(quotes_handler);
+    return quotes_handler;
 }
 
 export function update_question(quotes_handler: QuotesHandler): QuotesHandler {
@@ -173,7 +177,7 @@ export function get_right_quote(loaded_quotes: LoadedQuotes, quotes_handler: Quo
     return loaded_quotes.quotes[quotes_handler.right_idx];
 }
 
-function dwn(url: string, callback: { (response: string): void }): void {
+function download_file(url: string, callback: { (response: string): void }): void {
     let request = new XMLHttpRequest();
     request.onload = () => {
         if (request.status == 200)
@@ -189,6 +193,7 @@ function dwn(url: string, callback: { (response: string): void }): void {
     request.send();
 }
 
+// union-find structure
 function find(quotes_handler: QuotesHandler, x: number): number {
     while (x != quotes_handler.link[x])
         x = quotes_handler.link[x];
@@ -210,6 +215,7 @@ function unite(quotes_handler: QuotesHandler, a: number, b: number): void {
     --quotes_handler.components_amount;
 }
 
+// ordering algorithms
 function calc_order(quotes_handler: QuotesHandler): void {
     quotes_handler.quotes_order = [];
     let status: number[] = [];
@@ -237,6 +243,7 @@ function top_sort(quotes_handler: QuotesHandler, cur: number, status: number[]):
     status[cur] = 2;
 }
 
+// find optimal next question
 function get_unconnected(quotes_handler: QuotesHandler, start: number): number {
     // get all from start reachable nodes
     let visited: boolean[] = [];
@@ -255,6 +262,7 @@ function get_unconnected(quotes_handler: QuotesHandler, start: number): number {
             return unreachable;
     return -1;
 }
+// can target be reached from start?
 function is_connected(quotes_handler: QuotesHandler, start: number, target: number): boolean {
     let visited: boolean[] = [];
     for (let i = 0; i < quotes_handler.quotes_amount; ++i)
@@ -274,11 +282,12 @@ function top_search(quotes_handler: QuotesHandler, cur: number, visited: boolean
     return false;
 }
 
+// set answer, log and get next question
 function set_answer(quotes_handler: QuotesHandler, better: number, worse: number): void {
     set_answer_headless(quotes_handler, better, worse);
     calc_order(quotes_handler);
     next_question(quotes_handler);
-    quotes_handler.answers.push({ better, worse });
+    quotes_handler.answers.push([better, worse]);
 }
 function set_answer_headless(quotes_handler: QuotesHandler, better: number, worse: number): void {
     console.log(`${better} better than ${worse}`);
@@ -305,7 +314,7 @@ function next_question(quotes_handler: QuotesHandler): void {
             }
         }
     }
-    // else get unconnected quotes, the system can't tell which one's better
+    // else get unconnected quotes <- the system can't tell which one's better
     else {
         for (let left_idx of quotes_idxs) {
             let right_idx = get_unconnected(quotes_handler, left_idx);
@@ -318,4 +327,5 @@ function next_question(quotes_handler: QuotesHandler): void {
     }
     console.log("no more info required");
     quotes_handler.done = true;
+    // have a nice day
 }

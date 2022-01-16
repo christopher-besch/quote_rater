@@ -25,7 +25,7 @@ const Home: React.FC = (props) => {
 
     // run for each refresh
     useEffect(() => {
-        // update input values
+        // load input values from url
         let url_search_params = new URLSearchParams(location.search);
 
         let quotes_url_raw = url_search_params.get("quotes_url");
@@ -36,7 +36,7 @@ const Home: React.FC = (props) => {
         let answers_json_raw = url_search_params.get("answers_json");
         let answers_json_input = document.getElementById("answers_json_input") as HTMLInputElement;
         if (answers_json_input.value == "")
-            answers_json_input.value = answers_json_raw ? answers_json_raw : "";
+            answers_json_input.value = answers_json_raw ? answers_json_raw : "[]";
     });
 
     function load() {
@@ -57,7 +57,7 @@ const Home: React.FC = (props) => {
             set_loaded_quotes((loaded_quotes) => {
                 return update_loaded_quotes(loaded_quotes, new_quotes_handler);
             });
-            return new_quotes_handler
+            return new_quotes_handler;
         });
     }
     function equal_button_callback() {
@@ -66,7 +66,7 @@ const Home: React.FC = (props) => {
             set_loaded_quotes((loaded_quotes) => {
                 return update_loaded_quotes(loaded_quotes, new_quotes_handler);
             });
-            return new_quotes_handler
+            return new_quotes_handler;
         });
     }
     function right_button_callback() {
@@ -75,7 +75,7 @@ const Home: React.FC = (props) => {
             set_loaded_quotes((loaded_quotes) => {
                 return update_loaded_quotes(loaded_quotes, new_quotes_handler);
             });
-            return new_quotes_handler
+            return new_quotes_handler;
         });
     }
 
