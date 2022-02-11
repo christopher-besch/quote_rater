@@ -95,6 +95,7 @@ export function setup_loaded_quotes(quotes_url_input: HTMLInputElement, answers_
         while (match = quote_regex.exec(response)) {
             loaded_quotes.quotes.push({ origin: match[1], text: match[2], author: match[3], comments: match[4] });
         }
+        console.log(`parsed ${loaded_quotes.quotes.length} quotes`);
         callback(loaded_quotes);
     });
 }
